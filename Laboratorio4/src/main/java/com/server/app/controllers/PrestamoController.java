@@ -66,6 +66,7 @@ public class PrestamoController {
     }
 
     @PostMapping("/prestamos")
+    @PreAuthorize("hasRole('USER')")
     public ResponseEntity<PrestamoDto> solicitar(@Valid @RequestBody PrestamoRequest request) {
         User user = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
