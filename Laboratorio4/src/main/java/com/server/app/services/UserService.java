@@ -1,14 +1,17 @@
 package com.server.app.services;
 
+import com.server.app.config.JsonWebToken;
 import com.server.app.dto.auth.LoginResponseDTO;
 import com.server.app.dto.auth.SignupRequest;
+import com.server.app.dto.auth.UpdatePasswordDto;
 import com.server.app.dto.auth.UpdatePasswordRequest;
+import com.server.app.dto.response.AuthResponse;
+import com.server.app.dto.user.UpdateProfileDto;
 import com.server.app.dto.user.UserCreateDto;
 import com.server.app.dto.user.UserUpdateDto;
 import com.server.app.entities.Role;
 import com.server.app.entities.User;
-import com.server.app.exceptions.ConfictException;
-import com.server.app.exceptions.NotFoundException;
+import com.server.app.exceptions.*;
 import com.server.app.repositories.RoleRepository;
 import com.server.app.repositories.UserRepository;
 import lombok.AllArgsConstructor;
@@ -24,7 +27,46 @@ public class UserService {
 
     private final PasswordEncoder passwordEncoder;
     private final UserRepository userRepository;
+    private final JsonWebToken jwt;
     private final RoleRepository roleRepository;
+
+    public AuthResponse login(String username, String password) {
+        User user = userRepository.findUserByUsername(username)
+                .orElseThrow(() -> new UnauthorizedException("Usuario no encontrado"));
+
+        if (user.isBlocked()) {
+            throw new UnauthorizedException("Your account has been blocked");
+        }
+
+        if (!passwordEncoder.matches(password, user.getPassword())) {
+            throw new UnauthorizedException("Contraseña incorrecta");
+        }
+
+        String token = jwt.createToken(user);
+        return new AuthResponse(token, user);
+    }
+
+    @Transactional
+    public AuthResponse signUp(UserCreateDto dto) {
+        uniqueUsername(dto.getUsername(), null);
+        uniqueEmail(dto.getEmail(), null);
+        User user = new User();
+        user.setUsername(dto.getUsername());
+        user.setName(dto.getName());
+        user.setSurname(dto.getSurname());
+        user.setEmail(dto.getEmail());
+        user.setPassword(passwordEncoder.encode(dto.getPassword()));
+
+        Role defaultRole = roleRepository.findById(2L)
+                .orElseThrow(() -> new NotFoundException(
+                        "Rol por defecto no encontrado, verifica que el rol este registrado en al base de datos"));
+        user.setRole(defaultRole);
+
+        userRepository.save(user);
+        String token = jwt.createToken(user);
+
+        return new AuthResponse(token, user);
+    }
 
     @Transactional
     public User create(UserCreateDto dto) {
@@ -48,6 +90,55 @@ public class UserService {
 
     public Page<User> findAll(int page, int size, String search) {
         return userRepository.findAll(PageRequest.of(page, size), search);
+    }
+
+    public User findById(int id) {
+        return userRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Usuario no encontrado"));
+    }
+
+    @Transactional
+    public AuthResponse updateProfile(String token, UpdateProfileDto dto) {
+        int userId = jwt.extractIdUser(token);
+        User user = findById(userId);
+
+        if (user.isBlocked()) {
+            throw new UnauthorizedException("Your account has been blocked");
+        }
+
+        uniqueEmail(dto.getEmail(), userId);
+        uniqueUsername(dto.getUsername(), userId);
+        user.setUsername(dto.getUsername());
+        user.setName(dto.getName());
+        user.setSurname(dto.getSurname());
+        user.setEmail(dto.getEmail());
+        User updatedUser = userRepository.save(user);
+        return new AuthResponse(token, updatedUser);
+    }
+
+    @Transactional
+    public User updatePassword(String token, UpdatePasswordDto dto) {
+        int id = jwt.extractIdUser(token);
+        User user = findById(id);
+
+        if (user.isBlocked()) {
+            throw new UnauthorizedException("Your account is blocked");
+        }
+
+        if (!passwordEncoder.matches(dto.getOldpassword(), user.getPassword())) {
+            throw new ForbiddenException("La contraseña actual es incorrecta");
+        }
+
+        if (passwordEncoder.matches(dto.getNewpassword(), user.getPassword())) {
+            throw new BadRequestException("La nueva contraseña no puede ser igual a la anterior");
+        }
+
+        if (!dto.getNewpassword().equals(dto.getConfirmpassword())) {
+            throw new BadRequestException("Las contraseñas nuevas no coinciden");
+        }
+
+        user.setPassword(passwordEncoder.encode(dto.getNewpassword()));
+        return userRepository.save(user);
     }
 
     @Transactional
@@ -89,10 +180,6 @@ public class UserService {
         return userRepository.save(user);
     }
 
-    public User findById(int userId) {
-        return userRepository.findById(userId).orElseThrow();
-    }
-
     private void uniqueUsername(String username, Integer id) {
         userRepository.findUserByUsername(username).ifPresent(existing -> {
             if (id == null || existing.getId() != id) {
@@ -107,62 +194,5 @@ public class UserService {
                 throw new ConfictException("El correo electrónico ya está en uso");
             }
         });
-    }
-
-    private User findByUsername(String username) {
-        return userRepository.findUserByUsername(username)
-                .orElseThrow(() -> new NotFoundException("Usuario no encontrado"));
-    }
-
-    public User login(String username, String password) {
-        User user = findByUsername(username);
-
-        if (!passwordEncoder.matches(password, user.getPassword())) {
-            throw new ConfictException("Credenciales inválidas");
-        }
-
-        if (user.isBlocked()) {
-            throw new ConfictException("Cuenta bloqueada");
-        }
-        return user;
-    }
-
-    @Transactional
-    public User signUp(SignupRequest request) {
-        uniqueUsername(request.getUsername(), null);
-        uniqueEmail(request.getEmail(), null);
-
-        Role adminRole = roleRepository.findByName("ADMIN")
-                .orElseThrow(() -> new NotFoundException("Rol ADMIN no configurado"));
-
-        UserCreateDto createRequest = new UserCreateDto(
-                request.getUsername(),
-                request.getName(),
-                request.getSurname(),
-                request.getEmail(),
-                request.getPassword(),
-                adminRole.getId()
-        );
-
-        return create(createRequest);
-    }
-
-    @Transactional
-    public User updatePassword(Integer userId, UpdatePasswordRequest request) {
-        if (!request.getNewPassword().equals(request.getConfirmPassword())) {
-            throw new ConfictException("Las nuevas contraseñas no coinciden");
-        }
-
-        User user = findById(userId);
-
-        if (!passwordEncoder.matches(request.getOldPassword(), user.getPassword())) {
-            throw new ConfictException("La contraseña actual es incorrecta");
-        }
-
-        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
-
-        userRepository.save(user);
-
-        return user;
     }
 }

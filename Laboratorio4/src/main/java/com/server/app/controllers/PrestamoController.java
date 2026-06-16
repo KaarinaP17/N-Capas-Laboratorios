@@ -43,7 +43,6 @@ public class PrestamoController {
     private final PlanPagoMapper planPagoMapper;
 
     @GetMapping("/prestamos")
-    @PreAuthorize("hasRole('USER')")
     public ResponseEntity<Pagination<PrestamoDto>> getMisPrestamos(
             @PageableDefault(size = 10, sort = "id") Pageable pageable) {
 
@@ -66,7 +65,6 @@ public class PrestamoController {
     }
 
     @PostMapping("/prestamos")
-    @PreAuthorize("hasRole('USER')")
     public ResponseEntity<PrestamoDto> solicitar(@Valid @RequestBody PrestamoRequest request) {
         User user = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
@@ -85,7 +83,6 @@ public class PrestamoController {
     }
 
     @GetMapping("/prestamos/{id}/planes-pago")
-    @PreAuthorize("hasRole('USER')")
     public ResponseEntity<Pagination<PlanPagoDto>> getPlanesPago(
             @PathVariable Long id,
             @PageableDefault(size = 20, sort = "numeroCuota") Pageable pageable) {

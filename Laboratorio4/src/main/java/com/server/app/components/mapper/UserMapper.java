@@ -16,7 +16,7 @@ public class UserMapper {
 
         return AuthResponse.builder()
                 .jwt(jwt)
-                .data(toLoginResponseDTO(user))
+                .data(user)
                 .build();
     }
 

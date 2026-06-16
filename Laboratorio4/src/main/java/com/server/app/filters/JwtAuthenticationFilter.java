@@ -70,6 +70,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 return;
             }
 
+            // 📦 Claims
             Claims claims = jwtUtil.extracClaims(token);
 
             if (claims == null) {
@@ -95,6 +96,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 sendErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "Your account has been blocked");
                 return;
             }
+
+            System.out.println(user);
 
             Set<GrantedAuthority> authorities =
                     user.getRole()

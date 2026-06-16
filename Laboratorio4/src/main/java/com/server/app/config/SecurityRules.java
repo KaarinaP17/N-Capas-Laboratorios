@@ -5,14 +5,25 @@ import java.util.Set;
 
 public class SecurityRules {
 
+    //public endpoint
     public static final Map<String, Set<String>> PUBLIC = Map.of(
             "GET", Set.of("/api/public/info"),
-            "POST", Set.of("/api/auth/login","/api/auth/signup")
+            "POST", Set.of("/api/auth/login", "/api/auth/signup")
     );
 
+    //just auth required
     public static final Map<String, Set<String>> AUTH_ONLY = Map.of(
-            "GET", Set.of("/api/auth/profile"),
-            "POST", Set.of("/api/auth/logout")
+            "GET",
+            Set.of("/api/auth/profile",
+                    "/api/finanzas/prestamos",
+                    "/api/finanzas/prestamos/{id}/planes-pago",
+                    "/api/finanzas/resumen-credito"
+            ),
+            "POST",
+            Set.of("/api/auth/logout",
+                    "/api/finanzas/prestamos",
+                    "/api/finanzas/abonos"
+            )
     );
 
     public static final Set<String> IGNORED = Set.of("/error");
