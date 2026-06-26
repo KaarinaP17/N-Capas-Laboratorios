@@ -8,6 +8,7 @@ on:
 
 jobs:
   build-and-push-image:
+    needs: [build-and-test, smoke-test-compose]
     runs-on: ubuntu-latest
 
     steps:
