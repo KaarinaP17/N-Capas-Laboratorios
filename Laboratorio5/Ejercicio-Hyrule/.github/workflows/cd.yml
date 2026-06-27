@@ -1,20 +1,17 @@
 name: Deploy on Docker Hub
 
 on:
-  # cuando se haga push a main
   push:
     branches: [ "main" ]
   workflow_dispatch:
 
 jobs:
   build-and-push-image:
-    needs: [build-and-test, smoke-test-compose]
     runs-on: ubuntu-latest
-
     steps:
       - name: code-checkout
         uses: actions/checkout@v4
-      # Se encarga de iniciar sesion en Docker hub
+
       - name: Login Docker Hub
         uses: docker/login-action@v3
         with:
@@ -24,7 +21,8 @@ jobs:
       - name: Build n push
         uses: docker/build-push-action@v6
         with:
-          context: .
+          context: Laboratorio5/Ejercicio-Hyrule
+          file: Laboratorio5/Ejercicio-Hyrule/Dockerfile
           push: true
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/buhosapp:latest
